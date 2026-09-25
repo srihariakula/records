@@ -51,6 +51,18 @@ def _validate_document_id(document_id: str) -> str:
     return document_id
 
 
+def _safe_file_name(name: Optional[str]) -> str:
+    # `name` is caller-supplied (BeginUpload / UploadDocument / SaveToCache) and
+    # becomes a path under the entry's directory -- keep only its final
+    # component so "../../x" can't write outside the cache, or point delete()'s
+    # rmtree of the file's parent at an arbitrary directory. Both separators
+    # are stripped since the name may come from a Windows client.
+    base = (name or "").replace("\\", "/").rsplit("/", 1)[-1]
+    if base in ("", ".", "..") or base == document_session.RENDERED_PDF_FILENAME:
+        return "document.bin"
+    return base
+
+
 def check_passcode(passcode: Optional[str]) -> None:
     if ACCESS_PASSCODE and passcode != ACCESS_PASSCODE:
         raise ConversionError("Unauthorized: passcode is incorrect", status_code=401)
@@ -138,7 +150,7 @@ class DocumentCache:
         document_id = _validate_document_id(document_id)
         entry_dir = CACHE_ROOT / document_id
         entry_dir.mkdir(exist_ok=True)
-        file_path = entry_dir / (name or "document.bin")
+        file_path = entry_dir / _safe_file_name(name)
         file_path.write_bytes(data)
 
         detected_mime = document_session.detect_mime_type(file_path, mime_type)

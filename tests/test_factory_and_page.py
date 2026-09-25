@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.services import cache_store
 from app.services.cache_store import cache
 
 client = TestClient(app)
@@ -59,6 +60,25 @@ def test_load_from_cache_missing_returns_null_document():
 def test_document_id_path_traversal_is_rejected():
     resp = client.post("/Factory/LoadFromCache", json={"document_id": "../../etc/passwd"})
     assert resp.status_code == 400
+
+
+@pytest.mark.parametrize("name", ["../../escaped.txt", "..\\..\\escaped.txt", "{tmp}/escaped.txt", ".."])
+def test_document_name_path_traversal_stays_inside_entry_dir(name, tmp_path, monkeypatch):
+    # Cache rooted in tmp_path, and cleanup never goes through cache.delete():
+    # if the fix regresses, delete() would rmtree the escaped file's parent
+    # directory -- this test must stay harmless even then.
+    monkeypatch.setattr(cache_store, "CACHE_ROOT", tmp_path / "cache")
+    (tmp_path / "cache").mkdir()
+    name = name.replace("{tmp}", str(tmp_path))  # absolute case, still inside tmp_path
+    try:
+        resp = client.post("/Factory/SaveToCache", json={"document_id": "name-traversal", "name": name})
+        assert resp.status_code == 200
+        entry = cache.require("name-traversal")
+        entry_dir = tmp_path / "cache" / "name-traversal"
+        assert entry.file_path.parent == entry_dir
+        assert entry.file_path.resolve().parent == entry_dir.resolve()
+    finally:
+        cache._entries.pop("name-traversal", None)
 
 
 def test_delete_missing_document_without_allow_flag_is_404():
