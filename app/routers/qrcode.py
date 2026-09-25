@@ -3,7 +3,7 @@ from fastapi import APIRouter, File, UploadFile
 from fastapi.responses import Response
 
 from app.models_qrcode import GenerateQrRequest, QRDetectionResponse
-from app.services import qr_code
+from app.services import content_disposition, qr_code
 
 router = APIRouter(prefix="/qrcode", tags=["qrcode"])
 
@@ -14,7 +14,7 @@ async def generate(request: GenerateQrRequest) -> Response:
     return Response(
         content=png_bytes,
         media_type="image/png",
-        headers={"Content-Disposition": f'attachment; filename="{qr_code.generate_qr_filename()}"'},
+        headers={"Content-Disposition": content_disposition.attachment(qr_code.generate_qr_filename())},
     )
 
 

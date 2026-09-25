@@ -6,7 +6,7 @@ from fastapi import APIRouter, File, Form, UploadFile
 from fastapi.responses import JSONResponse, Response
 
 from app.models import AnnotationObject, DocumentConverterRequest, DocumentConverterResponse
-from app.services import embed_convert, office_convert
+from app.services import content_disposition, embed_convert, office_convert
 
 router = APIRouter(prefix="/convert", tags=["convert"])
 
@@ -21,7 +21,7 @@ async def convert_to_pdf(file: UploadFile = File(...)) -> Response:
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{file.filename}.pdf"'},
+        headers={"Content-Disposition": content_disposition.attachment(f"{file.filename or 'document'}.pdf")},
     )
 
 

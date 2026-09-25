@@ -29,7 +29,7 @@ from app.models_factory import (
     UpdateAnnotatedFieldRequest,
     UploadDocumentRequest,
 )
-from app.services import ann_xml_export, annotate_export, document_session, field_extraction, multi_criteria_search, ner_client, ner_search, regex_concepts, search_text
+from app.services import ann_xml_export, annotate_export, content_disposition, document_session, field_extraction, multi_criteria_search, ner_client, ner_search, regex_concepts, search_text
 from app.services.cache_store import DocumentEntry, cache, check_passcode
 from app.services.concepts_registry import NER_CONCEPTS, REGEX_CONCEPTS, get_ner_concept, get_regex_concept
 from app.services.errors import ConversionError
@@ -147,7 +147,7 @@ async def download_document(
     return Response(
         content=entry.file_path.read_bytes(),
         media_type=entry.mime_type or "application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="{name}"'},
+        headers={"Content-Disposition": content_disposition.attachment(name)},
     )
 
 
@@ -161,7 +161,7 @@ async def download_annotations(document_id: str = Query(..., alias="documentId")
     return Response(
         content=payload,
         media_type="application/json",
-        headers={"Content-Disposition": f'attachment; filename="{entry.document_id}_ann.json"'},
+        headers={"Content-Disposition": content_disposition.attachment(f"{entry.document_id}_ann.json")},
     )
 
 
@@ -178,7 +178,7 @@ async def download_annotations_xml(document_id: str = Query(..., alias="document
     return Response(
         content=xml_bytes,
         media_type="application/xml",
-        headers={"Content-Disposition": f'attachment; filename="{entry.document_id}_ann.xml"'},
+        headers={"Content-Disposition": content_disposition.attachment(f"{entry.document_id}_ann.xml")},
     )
 
 
@@ -200,7 +200,7 @@ async def download_annotated_document(
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{name}_annotated.pdf"'},
+        headers={"Content-Disposition": content_disposition.attachment(f"{name}_annotated.pdf")},
     )
 
 

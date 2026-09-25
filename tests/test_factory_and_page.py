@@ -304,3 +304,22 @@ def test_update_annotated_field_out_of_range_index_is_400(document_with_text):
         "document_id": document_with_text, "page": 1, "index": 5, "label": "x",
     })
     assert resp.status_code == 400
+
+
+@pytest.mark.parametrize("file_name, ascii_name", [
+    ('a"; filename=evil.exe', "a__ filename_evil.exe"),
+    ("x\r\nSet-Cookie: s=1", "xSet-Cookie_ s_1"),
+    ("Bericht_報告.pdf", "Bericht_.pdf"),
+    ("../../etc/passwd", "passwd"),
+])
+def test_download_document_escapes_file_name_in_content_disposition(uploaded_document_id, file_name, ascii_name):
+    from urllib.parse import unquote
+
+    resp = client.get("/Factory/DownloadDocument", params={"documentId": uploaded_document_id, "fileName": file_name})
+    assert resp.status_code == 200
+    header = resp.headers["content-disposition"]
+    assert "\r" not in header and "\n" not in header
+    fallback, encoded = header.split("; filename*=UTF-8''")
+    assert fallback == f'attachment; filename="{ascii_name}"'
+    expected_full = "".join(ch for ch in file_name.rsplit("/", 1)[-1] if ch not in "\r\n")
+    assert unquote(encoded) == expected_full
