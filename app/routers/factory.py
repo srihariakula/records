@@ -270,6 +270,7 @@ async def search_multi_criteria(request: SearchMultiCriteriaRequest):
         case_sensitive=request.case_sensitive,
         whole_word=request.whole_word,
         use_regex=request.use_regex,
+        use_ner=request.use_ner,
     )
     return {"matches": matches, "total_matches": sum(len(v) for v in matches.values())}
 

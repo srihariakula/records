@@ -34,13 +34,20 @@ def search_multi_criteria(
     case_sensitive: bool = False,
     whole_word: bool = False,
     use_regex: bool = False,
+    use_ner: bool = False,
 ) -> Matches:
     """Returns {page: [[x0,y0,x1,y1], ...]} for pages where EVERY criterion
     (the text query, if given, plus every concept id) has at least one
     match -- boxes from all criteria on a qualifying page are unioned
-    together. Raises a 400 if neither a query nor any concept id is given."""
+    together. Raises a 400 if neither a query nor any concept id is given.
+
+    With `use_ner`, the query is sent to the GLiNER2 sidecar as a zero-shot
+    entity label (e.g. "medication") instead of being matched literally, and
+    the case/whole-word/regex flags are ignored."""
     criteria_results: List[Matches] = []
-    if query:
+    if query and use_ner:
+        criteria_results.append(ner_search.find_label_matches(pdf_path, query))
+    elif query:
         criteria_results.append(
             search_text.search_document(
                 pdf_path, query, case_sensitive=case_sensitive, whole_word=whole_word, use_regex=use_regex

@@ -223,3 +223,53 @@ def test_search_concept_endpoint_unknown_concept(sample_pdf_path):
         assert resp.status_code == 400
     finally:
         cache.delete(entry.document_id, allow_missing=True)
+
+
+def _fake_extract_entities(text, gliner_label, threshold=None):
+    # Stands in for the GLiNER2 sidecar: "finds" the label text itself.
+    start = text.lower().find("diabetes")
+    if gliner_label != "diagnosis" or start < 0:
+        return []
+    return [{"text": text[start:start + 8], "start": start, "end": start + 8}]
+
+
+def test_multi_criteria_use_ner_sends_query_as_gliner_label(sample_pdf_path, monkeypatch):
+    from app.services import ner_client
+
+    calls = []
+
+    def fake(text, gliner_label, threshold=None):
+        calls.append(gliner_label)
+        return _fake_extract_entities(text, gliner_label, threshold)
+
+    monkeypatch.setattr(ner_client, "extract_entities", fake)
+    matches = multi_criteria_search.search_multi_criteria(sample_pdf_path, "diagnosis", [], use_ner=True)
+    assert calls == ["diagnosis"]
+    assert list(matches.keys()) == [1]
+    assert len(matches[1]) == 1
+
+
+def test_multi_criteria_use_ner_ands_with_concepts(two_page_pdf_path, monkeypatch):
+    from app.services import ner_client
+
+    monkeypatch.setattr(ner_client, "extract_entities", _fake_extract_entities)
+    # No "diabetes" anywhere in two_page_pdf_path, so the NER criterion
+    # matches no page and the AND leaves nothing.
+    matches = multi_criteria_search.search_multi_criteria(two_page_pdf_path, "diagnosis", ["email"], use_ner=True)
+    assert matches == {}
+
+
+def test_search_multi_criteria_endpoint_use_ner(sample_pdf_path, monkeypatch):
+    from app.services import ner_client
+
+    monkeypatch.setattr(ner_client, "extract_entities", _fake_extract_entities)
+    entry = cache.put_bytes(None, sample_pdf_path.read_bytes(), name="test.pdf", mime_type="application/pdf")
+    try:
+        resp = client.post(
+            "/Factory/SearchMultiCriteria",
+            json={"document_id": entry.document_id, "query": "diagnosis", "use_ner": True},
+        )
+        assert resp.status_code == 200
+        assert list(resp.json()["matches"].keys()) == ["1"]
+    finally:
+        cache.delete(entry.document_id, allow_missing=True)

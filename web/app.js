@@ -474,6 +474,7 @@ el("search-btn").addEventListener("click", async () => {
         case_sensitive: el("search-case-sensitive").checked,
         whole_word: el("search-whole-word").checked,
         use_regex: el("search-regex").checked,
+        use_ner: el("search-ner").checked,
         concept_ids: conceptIds,
       }),
     }).then((r) => r.json());
@@ -484,6 +485,15 @@ el("search-btn").addEventListener("click", async () => {
 });
 el("search-input").addEventListener("keydown", (e) => {
   if (e.key === "Enter") el("search-btn").click();
+});
+
+// NER mode sends the search text to GLiNER2 as an entity type rather than
+// matching it literally, so the literal-match options don't apply.
+const LITERAL_SEARCH_OPTIONS = ["search-case-sensitive", "search-whole-word", "search-regex"];
+el("search-ner").addEventListener("change", () => {
+  const ner = el("search-ner").checked;
+  for (const id of LITERAL_SEARCH_OPTIONS) el(id).disabled = ner;
+  el("search-input").placeholder = ner ? "Entity type, e.g. medication..." : "Search this document...";
 });
 
 // Concept dropdown: Factory/ListConcepts is the source of truth for id+label
@@ -503,12 +513,11 @@ async function loadConcepts() {
     regexContainer.appendChild(buildConceptCheckbox(concept));
   }
 
-  const nerContainer = el("ner-concept-checks");
-  nerContainer.innerHTML = "";
-  for (const concept of info.ner_concepts) {
-    const row = buildConceptCheckbox(concept);
-    row.querySelector("input").disabled = !info.ner_available;
-    nerContainer.appendChild(row);
+  const nerCheckbox = el("search-ner");
+  nerCheckbox.disabled = !info.ner_available;
+  if (!info.ner_available && nerCheckbox.checked) {
+    nerCheckbox.checked = false;
+    nerCheckbox.dispatchEvent(new Event("change"));
   }
   el("ner-unavailable-hint").hidden = info.ner_available;
 }

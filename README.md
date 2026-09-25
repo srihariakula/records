@@ -53,7 +53,7 @@ beyond evaluation.
 | *(not in the original)* | `GET /Factory/ExtractAnnotatedFields` | resolves each labeled annotation against the real page text under it (`app/services/field_extraction.py`); returns a flat `fields` list (each with a `page`+`index` identifying its position in that page's annotation array) plus a `key_values` label→text dict |
 | *(not in the original)* | `POST /Factory/UpdateAnnotatedField` | edits one annotation's label and/or manually-corrected value in place, addressed by the `page`+`index` from `ExtractAnnotatedFields` — used by the viewer's editable fields table |
 | *(not in the original)* | `GET /Factory/SearchDocument` | whole-document text search via PyMuPDF's `page.search_for` (`app/services/search_text.py`); returns `{matches: {page: [[x0,y0,x1,y1], ...]}}`. Optional `caseSensitive`/`wholeWord`/`regex` query flags switch to a regex-driven path over `app/services/page_text_index.py` |
-| *(not in the original)* | `GET /Factory/ListConcepts` | lists the search bar's REGEX CONCEPTS / AI-assisted NER pills (`app/services/concepts_registry.py`) plus `ner_available` (is the GLiNER2 sidecar reachable) |
+| *(not in the original)* | `GET /Factory/ListConcepts` | lists the regex concepts (shown in the search bar's dropdown) and the predefined NER concepts (`app/services/concepts_registry.py`) plus `ner_available` (is the GLiNER2 sidecar reachable) |
 | *(not in the original)* | `GET /Factory/SearchConcept` | runs one named concept (`conceptId`) across the document — regex concepts via `app/services/regex_concepts.py`, NER concepts via `app/services/ner_search.py` + the GLiNER2 sidecar — same response shape as `SearchDocument`. See **AI-assisted NER (GLiNER2)** below |
 | *(not in the original)* | `POST /Factory/SearchMultiCriteria` | combines a free-text query and/or any number of concept ids into one **AND** search (`app/services/multi_criteria_search.py`) — only pages where every selected criterion matched are returned. Backs the search bar's concept dropdown — see below |
 
@@ -161,9 +161,9 @@ produces the same Guids across calls without needing a schema change to
 
 ## Multi-criteria search
 
-The search bar combines free text with a **Select concepts** dropdown
-(`#concept-dropdown` in `web/index.html`) listing every concept as a
-checkbox, grouped into:
+The search bar combines free text, an **NER** checkbox next to the search
+box, and a **Select concepts** dropdown (`#concept-dropdown` in
+`web/index.html`) listing the regex concepts as checkboxes:
 
 - **Regex concepts** (Email, Phone, DOB, Visit Date, Chase ID) — plain pattern
   matching, no model involved (`app/services/concepts_registry.py` +
@@ -171,17 +171,25 @@ checkbox, grouped into:
   pattern since regex alone can't distinguish their semantics; Chase ID has no
   universal standard format, so it defaults to a generic placeholder pattern
   overridable via `DOCSVC_CHASE_ID_REGEX` without touching code.
-- **AI-assisted · NER** (Person / member name, Any date, Diagnosis / condition,
-  Medication, Quality measure, Submeasure, Vitals) — zero-shot entity
-  extraction via [GLiNER2](https://github.com/fastino-ai/GLiNER2) (fastino-ai,
-  Apache-2.0), one arbitrary text label per concept (e.g. "healthcare quality
-  measure name") passed straight to the model — no fine-tuning or training
-  data needed. Most use the sidecar's default confidence threshold, but a
-  concept can override it (`NerConcept.threshold` in `concepts_registry.py`)
-  — Vitals needed a lower one (`0.25` vs. the `0.4` default) to reliably fire.
+- **NER checkbox** — with it ticked, the text typed in the search box is sent
+  to [GLiNER2](https://github.com/fastino-ai/GLiNER2) (fastino-ai,
+  Apache-2.0) as a zero-shot entity label (e.g. "medication" or "healthcare
+  quality measure name") instead of being matched literally, and every entity
+  the model finds for that label is highlighted — no fine-tuning or training
+  data needed (`use_ner` on `Factory/SearchMultiCriteria`, via
+  `ner_search.find_label_matches`). Case sensitive / Whole word / Regex don't
+  apply in this mode, so the viewer disables them while it's ticked.
 
-Clicking **Search** sends the text query (if any) plus every checked concept
-id to `Factory/SearchMultiCriteria` as one combined **AND** search: only
+The predefined AI-assisted concepts (Person / member name, Any date,
+Diagnosis / condition, Medication, Quality measure, Submeasure, Vitals) are
+no longer listed in the viewer's dropdown, but stay in `concepts_registry.py`
+and remain callable by id through `Factory/SearchConcept` and
+`Factory/SearchMultiCriteria`'s `concept_ids`. Most use the sidecar's default
+confidence threshold, but a concept can override it (`NerConcept.threshold`)
+— Vitals needed a lower one (`0.25` vs. the `0.4` default) to reliably fire.
+
+Clicking **Search** sends the text query (if any, as a GLiNER2 label when
+**NER** is ticked) plus every checked concept id to `Factory/SearchMultiCriteria` as one combined **AND** search: only
 pages where *every* selected criterion has at least one match are returned,
 with all their matched boxes on those pages highlighted together
 (`app/services/multi_criteria_search.py`). The single-criterion
@@ -198,8 +206,8 @@ HTTP (`app/services/ner_client.py`, pointed at `DOCSVC_NER_SERVICE_URL`,
 default `http://127.0.0.1:8801`). See `ner_service/README.md` for setup.
 
 If the sidecar isn't running, `Factory/ListConcepts` reports
-`ner_available: false` and the viewer grays out the AI-assisted pills instead
-of letting a click fail — the REGEX CONCEPTS pills and plain text search work
+`ner_available: false` and the viewer grays out the **NER** checkbox instead
+of letting a search fail — the regex concepts and plain text search work
 regardless. The sidecar loads its model at startup rather than on the first
 request (a cold load measured ~25s — see `ner_service/README.md`), so it
 also reports as unavailable for the ~20-30s it takes to start up the first
@@ -302,8 +310,9 @@ at `/viewer` by `app/main.py`, calling this port's own API directly:
   picked from the **Select concepts** dropdown (`Factory/SearchMultiCriteria`)
   — all selected criteria must match on a page (AND) — with clickable
   per-page match counts and yellow highlight boxes on the matched page, plus
-  Case sensitive / Whole word / Regex checkboxes for the text part. See
-  **Multi-criteria search** above
+  Case sensitive / Whole word / Regex checkboxes for the text part, and an
+  **NER** checkbox that sends the text to GLiNER2 as an entity type instead.
+  See **Multi-criteria search** above
 - Extract each labeled annotation's underlying page text as a key/value pair
   (`Factory/ExtractAnnotatedFields`), shown in an editable table: Label and
   Value are both `<input>`s, with a 💾 save button (enabled only once a value
@@ -421,7 +430,8 @@ pytest tests/ -v
   AND intersection (including the no-overlap-across-pages case and the
   no-criteria-given 400), and the `DownloadAnnotationsXml` export (node
   shape, real-data fields mapped correctly, empty-page-has-no-`<Object>`, and
-  the live endpoint). The
+  the live endpoint). The NER-checkbox path (`use_ner`) is covered with the
+  sidecar client mocked out; the real
   AI-assisted NER path isn't covered here since it needs `ner_service/`
   running — see **AI-assisted NER (GLiNER2)** above; it was instead verified
   manually against a real GLiNER2 model and sidecar process (see that

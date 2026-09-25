@@ -107,6 +107,7 @@ class SearchMultiCriteriaRequest(BaseModel):
     case_sensitive: bool = False
     whole_word: bool = False
     use_regex: bool = False
+    use_ner: bool = False  # treat `query` as a GLiNER2 entity label, not literal text
     concept_ids: List[str] = []
 
 

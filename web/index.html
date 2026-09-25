@@ -55,19 +55,15 @@
         <h2>Search document</h2>
         <div id="search-bar-row">
           <input type="text" id="search-input" placeholder="Search this document..." />
+          <label id="search-ner-label" title="Treat the search text as an entity type for the AI-assisted GLiNER2 service (e.g. &quot;medication&quot;)">
+            <input type="checkbox" id="search-ner" /> NER
+          </label>
           <div id="concept-dropdown">
             <button type="button" id="concept-dropdown-btn">Select concepts &#9662;</button>
             <div id="concept-dropdown-panel" hidden>
               <div class="concept-group">
                 <div class="concept-group-label">Regex concepts</div>
                 <div id="regex-concept-checks" class="concept-checklist"></div>
-              </div>
-              <div class="concept-group">
-                <div class="concept-group-label">AI-assisted &middot; NER</div>
-                <div id="ner-concept-checks" class="concept-checklist"></div>
-                <p id="ner-unavailable-hint" class="hint" hidden>
-                  AI-assisted NER service isn't running (see ner_service/README.md).
-                </p>
               </div>
             </div>
           </div>
@@ -78,8 +74,13 @@
           <label><input type="checkbox" id="search-whole-word" /> Whole word</label>
           <label><input type="checkbox" id="search-regex" /> Regex</label>
         </div>
+        <p id="ner-unavailable-hint" class="hint" hidden>
+          AI-assisted NER service isn't running (see ner_service/README.md).
+        </p>
         <p class="hint">
           Enter text and/or pick one or more concepts above &mdash; all selected criteria must match on a page (AND).
+          Tick <strong>NER</strong> to send the text to the AI-assisted GLiNER2 service as an entity type
+          (e.g. &ldquo;medication&rdquo;) instead of matching it literally.
         </p>
         <div id="search-results"></div>
       </section>
