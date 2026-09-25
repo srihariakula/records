@@ -22,6 +22,9 @@ class DocumentDTO(BaseModel):
     # Not in the original: set when the upload couldn't be converted to PDF
     # (unsupported format, missing LibreOffice component, corrupt file...).
     conversion_error: Optional[str] = None
+    # Not in the original: how many scanned/image-only pages got an OCR text
+    # layer (Tesseract) during this upload -- see app.services.ocr.
+    ocr_pages: int = 0
 
 
 class BeginUploadRequest(BaseModel):

@@ -41,7 +41,14 @@ page("PNG upload").save("$WORK_DIR/sample.png")
 frames = [page(f"TIFF page {i}") for i in (1, 2, 3)]
 frames[0].save("$WORK_DIR/sample.tif", save_all=True, append_images=frames[1:])
 open("$WORK_DIR/unsupported.bin", "wb").write(bytes(range(256)) * 4)
+# A "scanned" page (text flattened to pixels) for the OCR check.
+s = pymupdf.open(); sp = s.new_page(width=612, height=792)
+for i, line in enumerate(["HEMOGLOBIN A1C 7.6 H", "Patient: Nguyen, Thomas", "Medication: Metformin 500mg"]):
+    sp.insert_text((72, 100 + 40 * i), line, fontsize=18)
+sp.get_pixmap(dpi=200, colorspace=pymupdf.csGRAY).save("$WORK_DIR/scan.png")
 EOF
+# OCR checks only make sense where tesseract is installed.
+if command -v tesseract >/dev/null; then export OCR_EXPECTED=1; else export OCR_EXPECTED=0; fi
 
 cleanup() { kill "${APP_PID:-}" "${NER_PID:-}" 2>/dev/null; }
 trap cleanup EXIT

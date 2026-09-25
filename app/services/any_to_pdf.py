@@ -8,13 +8,18 @@ viewer's upload flow (app.services.document_session), /convert/to-pdf and
   - anything else (docx, xlsx, pptx, odt, rtf, txt, html, csv, ...)
                  -> app.services.office_convert (headless LibreOffice)
 
+then, for every type, app.services.ocr adds an invisible Tesseract text layer
+to scanned / image-only pages (best-effort; skipped if Tesseract is missing).
+
 Type detection sniffs the file's magic bytes first, because the viewer sends
 only a file name (no MIME type), names can be wrong or missing an extension,
 and browsers often declare application/octet-stream.
 """
 import mimetypes
+from dataclasses import dataclass
 from typing import Optional
 
+from app.services import ocr
 from app.services.errors import ConversionError
 from app.services.image_convert import image_bytes_to_pdf
 from app.services.office_convert import convert_bytes_to_pdf
@@ -75,8 +80,13 @@ def _looks_like_unknown_binary(data: bytes, mime: Optional[str]) -> bool:
     return b"\x00" in data[:4096]
 
 
-def to_pdf_bytes(data: bytes, filename: Optional[str] = None, mime_type: Optional[str] = None) -> bytes:
-    mime = mime_type or detect_mime_type(data[:16], filename)
+@dataclass
+class ConversionResult:
+    pdf_bytes: bytes
+    ocr_pages: int = 0  # pages that got an OCR text layer
+
+
+def _convert_only(data: bytes, filename: Optional[str], mime: str) -> bytes:
     if mime == PDF_MIME:
         return data
     if is_image_mime(mime):
@@ -86,3 +96,20 @@ def to_pdf_bytes(data: bytes, filename: Optional[str] = None, mime_type: Optiona
             f"PDF can not be generated: unsupported file type ({filename or 'upload'} is not a recognised "
             "document or image format)", status_code=415)
     return convert_bytes_to_pdf(data, filename or "document")
+
+
+def convert(data: bytes, filename: Optional[str] = None, mime_type: Optional[str] = None,
+            run_ocr: bool = True) -> ConversionResult:
+    """Any supported input -> PDF, plus an OCR text layer on scanned pages.
+    For a PDF that needs no OCR, the returned bytes are the input object."""
+    mime = mime_type or detect_mime_type(data[:16], filename)
+    pdf = _convert_only(data, filename, mime)
+    if not run_ocr:
+        return ConversionResult(pdf)
+    result = ocr.add_text_layer(pdf)
+    return ConversionResult(result.pdf_bytes, result.ocr_pages)
+
+
+def to_pdf_bytes(data: bytes, filename: Optional[str] = None, mime_type: Optional[str] = None,
+                 run_ocr: bool = True) -> bytes:
+    return convert(data, filename, mime_type, run_ocr).pdf_bytes

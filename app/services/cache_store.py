@@ -58,7 +58,7 @@ def _safe_file_name(name: Optional[str]) -> str:
     # rmtree of the file's parent at an arbitrary directory. Both separators
     # are stripped since the name may come from a Windows client.
     base = (name or "").replace("\\", "/").rsplit("/", 1)[-1]
-    if base in ("", ".", "..") or base == document_session.RENDERED_PDF_FILENAME:
+    if base in ("", ".", "..") or base in document_session.RESERVED_NAMES:
         return "document.bin"
     return base
 
@@ -80,6 +80,7 @@ class DocumentEntry:
     ttl_seconds: int = DEFAULT_TTL_SECONDS
     annotations: Dict[int, List[AnnotationObject]] = field(default_factory=dict)
     conversion_error: Optional[str] = None  # why the upload couldn't be turned into a PDF, if it couldn't
+    ocr_pages: int = 0  # scanned pages that got an OCR text layer
 
     def is_expired(self) -> bool:
         return (time.time() - self.last_access) > self.ttl_seconds
@@ -156,9 +157,10 @@ class DocumentCache:
 
         detected_mime = document_session.detect_mime_type(file_path, mime_type)
         page_count = 0
+        ocr_pages = 0
         conversion_error = None
         try:
-            pdf_path = document_session.get_pdf_path_for(file_path, detected_mime)
+            pdf_path, ocr_pages = document_session.ensure_pdf(file_path, detected_mime)
             page_count = document_session.count_pages(pdf_path)
         except ConversionError as exc:
             # Still cache the upload (the original can be downloaded, and a retry
@@ -166,7 +168,7 @@ class DocumentCache:
             conversion_error = exc.message
 
         entry = DocumentEntry(document_id=document_id, file_path=file_path, name=name, mime_type=detected_mime,
-                               page_count=page_count, conversion_error=conversion_error)
+                               page_count=page_count, conversion_error=conversion_error, ocr_pages=ocr_pages)
         with self._lock:
             self._entries[document_id] = entry
         return entry

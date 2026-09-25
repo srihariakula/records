@@ -31,11 +31,12 @@ This repo is a **proof of concept for scoping a LEADTOOLS → Python migration**
 
 - LEADTOOLS `DocumentConverter` / `DocumentFactory` loading → `any_to_pdf.to_pdf_bytes()`. PDFs pass through, images go to `image_convert.py` (Pillow + PyMuPDF), and office files go to headless LibreOffice (`office_convert.py`, which needs `libreoffice-writer`, `-calc` and `-impress`). Call the dispatcher; don't call a converter directly.
 - Rendering, text and search → PyMuPDF (`fitz`).
+- The OCR engine → Tesseract (`ocr.py`), which adds an invisible word-positioned text layer to scanned pages at upload. Anything reading PDF text gets OCR for free.
 - Annotation overlays → Pillow or PyMuPDF annotation objects.
 - QR codes → the `qrcode` library to write them and OpenCV to read them (no system zbar needed).
 - The `.ann` XML shape is in `ann_xml_export.py` (720 units per inch, i.e. PyMuPDF points × 10).
 
-If a capability has no open-source equivalent (OCR engine parity, SVG back-image, general multi-symbology barcodes, attachments inside container formats), don't fake it. Add it to the README's "Not ported" list with the reason and the likely engine (e.g. `pyzbar`), and stop.
+If a capability has no open-source equivalent (full LEADTOOLS OCR parity such as zones and forms, SVG back-image, general multi-symbology barcodes, attachments inside container formats), don't fake it. Add it to the README's "Not ported" list with the reason and the likely engine (e.g. `pyzbar`), and stop.
 
 ## Steps
 

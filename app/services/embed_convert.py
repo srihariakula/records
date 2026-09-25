@@ -26,7 +26,8 @@ ANNOTATIONS_FILENAME = "annotations.json"
 
 
 def _ensure_pdf_bytes(source_bytes: bytes, source_filename: str) -> bytes:
-    return to_pdf_bytes(source_bytes, source_filename)
+    # Output is rasterized JPEGs, so an OCR text layer would be thrown away.
+    return to_pdf_bytes(source_bytes, source_filename, run_ocr=False)
 
 
 def _draw_annotations(image: Image.Image, annotations: List[AnnotationObject], zoom: float) -> None:

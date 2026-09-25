@@ -25,7 +25,9 @@ apt-get install -y --no-install-recommends libreoffice-writer libreoffice-calc l
 
 `libreoffice-core` alone is a trap. `soffice` exists, but every conversion fails with "source file could not be loaded", even for a `.txt`. Writer covers docx/odt/rtf/txt/html, Calc covers xlsx/ods/csv, and Impress covers pptx/odp. When one is missing, `EndUpload`'s `conversion_error` names it.
 
-Uploads go through `app/services/any_to_pdf.py`. PDFs pass through, images go to `image_convert.py` (Pillow + PyMuPDF; one page per TIFF frame; DPI-based page size), and everything else goes to LibreOffice. The type is sniffed by content first. Converted images have no text layer, so there's no search on them until OCR exists.
+OCR of scanned pages needs Tesseract: `apt-get install -y --no-install-recommends tesseract-ocr` (English included). Without it, uploads still work but scans stay image-only, and the Tesseract tests and the browser OCR check skip. `DOCSVC_OCR=off` turns OCR off.
+
+Uploads go through `app/services/any_to_pdf.py`. PDFs pass through, images go to `image_convert.py` (Pillow + PyMuPDF; one page per TIFF frame; DPI-based page size), and everything else goes to LibreOffice. The type is sniffed by content first. Then `app/services/ocr.py` adds an invisible Tesseract text layer to every scanned or image-only page, so search, NER and field extraction work on scans. `EndUpload` reports `ocr_pages`.
 
 The real NER sidecar is optional for most work; see `ner_service/README.md` for how to set it up. For UI testing, use the fake sidecar below instead.
 
@@ -55,10 +57,11 @@ Unit tests don't cover `web/`. A CSS change once left the concept dropdown openi
 .claude/skills/document-service-dev/scripts/run_ui_check.sh [WORK_DIR]
 ```
 
-It starts the app on `:8811` and `scripts/fake_ner_sidecar.py` on `:8801`. The fake sidecar is a keyword stand-in for GLiNER2 that logs every label it receives. The script then drives Chromium through `scripts/ui_smoke_test.js`, first with the sidecar up (29 checks) and then with it down (4 checks), and shuts everything down. It exits non-zero on any failure.
+It starts the app on `:8811` and `scripts/fake_ner_sidecar.py` on `:8801`. The fake sidecar is a keyword stand-in for GLiNER2 that logs every label it receives. The script then drives Chromium through `scripts/ui_smoke_test.js`, first with the sidecar up (32 checks) and then with it down (4 checks), and shuts everything down. It exits non-zero on any failure.
 
 The checks cover:
 - any-format upload: a PNG, a 3-page TIFF, and an unsupported file (error shown, previous document kept);
+- OCR: a scanned image reports OCR, its text shows in the page-text panel, and literal search finds a word that exists only in the pixels (skipped without Tesseract);
 - the search bar layout and the NER checkbox;
 - that the dropdown lists regex concepts only;
 - literal search versus NER search, including that the exact typed label is sent to GLiNER2;

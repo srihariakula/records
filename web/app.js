@@ -107,7 +107,7 @@ async function refreshText() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ document_id: state.documentId, page_number: state.currentPage, build_text: true }),
   }).then((r) => r.json());
-  el("page-text").textContent = resp.text && resp.text.trim() ? resp.text : "(no embedded text on this page — scanned pages need OCR, which isn't ported)";
+  el("page-text").textContent = resp.text && resp.text.trim() ? resp.text : "(no text on this page — it may be blank, or a scan OCR couldn't read or wasn't run on)";
 }
 
 async function getPageAnnotations() {
@@ -405,7 +405,8 @@ el("upload-btn").addEventListener("click", async () => {
     state.highlightedField = null;
     resetConceptSelection();
     setResolution(BASE_RESOLUTION);
-    el("doc-info").textContent = `${doc.name || file.name} — ${doc.mime_type}, ${doc.page_count} page(s)`;
+    el("doc-info").textContent = `${doc.name || file.name} — ${doc.mime_type}, ${doc.page_count} page(s)` +
+      (doc.ocr_pages ? `, text recognized (OCR) on ${doc.ocr_pages} scanned page(s)` : "");
     el("download-link").href = `/Factory/DownloadDocument?documentId=${doc.document_id}`;
     el("download-annotated-link").href = `/Factory/DownloadAnnotatedDocument?documentId=${doc.document_id}`;
     el("download-ann-xml-link").href = `/Factory/DownloadAnnotationsXml?documentId=${doc.document_id}`;

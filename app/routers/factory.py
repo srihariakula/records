@@ -46,6 +46,7 @@ def _to_dto(entry: DocumentEntry) -> DocumentDTO:
         page_count=entry.page_count,
         has_annotations=entry.has_annotations(),
         conversion_error=entry.conversion_error,
+        ocr_pages=entry.ocr_pages,
     )
 
 

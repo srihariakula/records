@@ -34,7 +34,7 @@ It doesn't stop DNS rebinding. If you add another outbound fetch, reuse `fetch_u
 
 ## Patient data (PHI)
 
-Documents can hold real patient data even though the bundled samples are synthetic. `ner_client.py` and `ner_service/main.py` must never log request or response bodies, page text, labels or entity text, and extraction results are never persisted. Only uploaded documents live in the cache, and they expire by TTL. New sample files must be clearly synthetic: fictitious names, generated MRNs, and a "not PHI" footer (see `hedis-sample-charts`).
+Documents can hold real patient data even though the bundled samples are synthetic. `ner_client.py`, `ner_service/main.py` and `ocr.py` (Tesseract output) must never log request or response bodies, page text, labels or entity text, and extraction results are never persisted. Only uploaded documents live in the cache, and they expire by TTL. New sample files must be clearly synthetic: fictitious names, generated MRNs, and a "not PHI" footer (see `hedis-sample-charts`).
 
 ## Tests must be safe even if the fix regresses
 

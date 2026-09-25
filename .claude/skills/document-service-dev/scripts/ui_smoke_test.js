@@ -155,7 +155,24 @@ const resetLabels = () => fs.existsSync(LABEL_LOG) && fs.unlinkSync(LABEL_LOG);
   check('unsupported file shows the conversion error', /Could not open unsupported\.bin: .*unsupported file type/.test(info), info);
   check('previous document stays open after a failed upload', !(await p.isHidden('#viewer')) && (await p.locator('#thumbnails img').count()) === 3);
 
-  // 11. Narrow window: row wraps, nothing overflows
+  // 11. OCR: a scanned image gets a text layer, so literal search finds its words
+  if (process.env.OCR_EXPECTED === '1') {
+    info = await uploadAndWait(`${S}/scan.png`);
+    check('scanned image reports OCR in the status line', /text recognized \(OCR\) on 1 scanned page/.test(info), info);
+    await p.waitForSelector('#page-image[src]');
+    await p.waitForFunction(() => /HEMOGLOBIN/.test(document.querySelector('#page-text').textContent));
+    check('OCR text shows in the page text panel', /Nguyen/.test(await p.textContent('#page-text')));
+    if (await p.isChecked('#search-ner')) await p.uncheck('#search-ner');
+    await p.fill('#search-input', 'Metformin');
+    res = await search();
+    check('literal search finds a word that only exists in the scan pixels', /Page 1: 1 match/.test(res), res);
+    await p.waitForTimeout(300);
+    await p.screenshot({ path: `${S}/6-ocr-search.png`, clip: { x: 150, y: 120, width: 700, height: 360 } });
+  } else {
+    console.log('SKIP  OCR checks (tesseract not installed)');
+  }
+
+  // 12. Narrow window: row wraps, nothing overflows
   await p.setViewportSize({ width: 1024, height: 800 });
   await p.waitForTimeout(200);
   const ov = await p.$eval('#search-bar-row', r => r.scrollWidth > r.clientWidth + 1);

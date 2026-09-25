@@ -82,7 +82,7 @@ this port's simpler cache model.
 |---------------------------|----------------------------|-------|
 | `GET Page/GetImage`       | `GET /Page/GetImage`       | query params keep the original camelCase names (`documentId`, `pageNumber`, ...) for easier frontend reuse |
 | `GET Page/GetThumbnail`   | `GET /Page/GetThumbnail`   | same |
-| `POST Page/GetText`       | `POST /Page/GetText`       | PDF text layer only — **no OCR** (see limitations) |
+| `POST Page/GetText`       | `POST /Page/GetText`       | PDF text layer; scanned pages get one from **Tesseract** OCR at upload (see **OCR** below) |
 | `POST Page/GetAnnotations`| `POST /Page/GetAnnotations`| our JSON `AnnotationObject` schema, not `.ann` XML |
 | `POST Page/SetAnnotations`| `POST /Page/SetAnnotations`| |
 
@@ -252,6 +252,42 @@ or an extension-less `.docx`, still converts correctly. Why LibreOffice isn't
 used for images: without its Draw component it can't import images at all,
 and even with it a 3-page TIFF came out as 11 pages.
 
+## OCR (scanned pages → searchable text)
+
+Scanned and image-only pages get a real text layer at upload, from
+[Tesseract](https://github.com/tesseract-ocr/tesseract)
+(`app/services/ocr.py`). This runs after every conversion in
+`any_to_pdf.convert()`, so it covers image uploads, image-only PDFs (e.g. fax
+PDFs) and office files with embedded scans alike.
+
+- **Which pages:** a page is OCR'd if images cover part of it and it has no
+  text, or only a stamped fax/scanner header on a mostly-image page. Pages that
+  already have real text are never touched.
+- **How** (the "sandwich" approach OCRmyPDF uses):
+  1. The page is rendered at 300 DPI.
+  2. Tesseract returns each word and its pixel box (TSV).
+  3. A text-only page is built with each word as invisible text stretched to
+     exactly its box.
+  4. That page is overlaid on the original. It works on `/Rotate`d pages too.
+
+  The page looks identical, but `Page/GetText`, text search, regex concepts,
+  NER and extracted fields now work on it with no changes of their own, and
+  highlights land on the words. Tesseract's own text-only PDF output was tried
+  first, but its word widths came out up to ~10% short, so highlights missed
+  the ends of words.
+- **Reporting:** `EndUpload` returns `ocr_pages`, the number of scanned pages
+  that got text, and the viewer shows it. The OCR'd PDF is cached with the
+  document, so OCR runs once per upload.
+- **Install:** `apt-get install tesseract-ocr` (English is included; add
+  `tesseract-ocr-<lang>` for others), or `brew install tesseract` on macOS.
+  Without it, uploads still work and scans stay image-only.
+- **Configuration:** `DOCSVC_OCR` (`auto`, the default, or `off`),
+  `DOCSVC_OCR_LANG` (default `eng`, e.g. `eng+spa`), `DOCSVC_OCR_DPI` (300),
+  `DOCSVC_OCR_MAX_PAGES` (200 per document) and `DOCSVC_OCR_TIMEOUT` (120 s
+  per page).
+- **Patient data:** recognized text is never logged, and the temporary page
+  images are deleted as soon as each page is done.
+
 ## Honest limitations vs. the original
 
 - **Annotation format is not compatible.** LEADTOOLS' `.ann` XML
@@ -259,9 +295,12 @@ and even with it a 3-page TIFF came out as 11 pages.
   stamps, redaction, encryption, hyperlinks, grouping, ...). This port defines a
   minimal JSON schema (`AnnotationObject` in [app/models.py](app/models.py)) covering
   only rectangles and text labels.
-- **No OCR.** `Page/GetText` reads the PDF's embedded text layer via PyMuPDF.
-  Scanned/image-only pages return empty text — LEADTOOLS' OCR engine integration
-  isn't ported.
+- **OCR is Tesseract, not LEADTOOLS' OCR engine** (see **OCR** above).
+  Accuracy is Tesseract's: fine on clean printed scans, weaker on handwriting,
+  low-resolution faxes and complex tables. Pages displayed sideways (not
+  corrected with `/Rotate`) aren't read, and the invisible text uses a Latin
+  font, so non-Latin languages need more work. It runs synchronously during
+  upload (about 0.5–1.5 s per scanned page, pages in parallel).
 - **Office/text inputs require LibreOffice installed separately**
   (`brew install --cask libreoffice` on macOS; on Debian/Ubuntu
   `apt-get install libreoffice-writer libreoffice-calc libreoffice-impress`,
@@ -271,8 +310,9 @@ and even with it a 3-page TIFF came out as 11 pages.
   without `-calc` spreadsheets/CSV fail, without `-impress` slides fail, and
   `EndUpload`'s `conversion_error` names the missing one. Images and PDFs don't
   need LibreOffice.
-- **Converted images are image-only pages** (no text layer, since there's no
-  OCR), so text search, NER and field extraction find nothing on them.
+- **Without Tesseract installed, scans stay image-only**, so text search, NER
+  and field extraction find nothing on them. OCR is best-effort and never fails
+  an upload.
 - **Conversion fidelity will differ** from LEADTOOLS' (or Word's) layout engine —
   expect font substitution and minor pagination differences on complex documents.
 - **The document cache is in-process and disk-backed under the OS temp dir**
@@ -289,7 +329,7 @@ and even with it a 3-page TIFF came out as 11 pages.
   params are the exception — those keep the original names.
 - **No auth.** The original's `AuthFilter`/user-token handling isn't ported;
   every endpoint here is unauthenticated. Don't deploy this as-is.
-- **No OCR, forms recognition, general barcode reading, DICOM, or SharePoint
+- **No forms recognition, general barcode reading, DICOM, or SharePoint
   integration** — those are separate LEADTOOLS modules/controllers (`Structure`,
   `Page.ReadBarcodes`, `SharePoint`, etc.), out of scope for this PoC. QR code
   generation/detection specifically *is* ported — see the `qrcode` section above.
