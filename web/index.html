@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>document-service-py viewer</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>document-service-py</h1>
+    <p class="subtitle">
+      A from-scratch viewer against the Python/FastAPI port.
+    </p>
+  </header>
+
+  <section id="upload-bar">
+    <input type="file" id="file-input" />
+    <button id="upload-btn">Upload</button>
+    <span id="doc-info"></span>
+  </section>
+
+  <main id="viewer" hidden>
+    <aside id="thumbnails-panel">
+      <div class="panel-header">
+        <span>Pages</span>
+        <button id="toggle-thumbnails-btn" class="toggle-btn" title="Hide page navigator">&#9660;</button>
+      </div>
+      <div id="thumbnails"></div>
+    </aside>
+
+    <div id="page-area">
+      <div id="page-toolbar">
+        <button id="prev-page">&larr; Prev</button>
+        <span id="page-indicator"></span>
+        <button id="next-page">Next &rarr;</button>
+        <button id="zoom-out-btn">&minus;</button>
+        <span id="zoom-indicator">100%</span>
+        <button id="zoom-in-btn">+</button>
+        <button id="add-annotation-btn" class="icon-btn" title="Add rectangle annotation" aria-label="Add rectangle annotation">&#9645;</button>
+        <button id="clear-annotations-btn" class="icon-btn" title="Clear page annotations" aria-label="Clear page annotations">&#128465;&#65039;</button>
+        <a id="download-link" class="icon-btn" target="_blank" title="Download document" aria-label="Download document">&#11015;&#65039;</a>
+        <a id="download-annotated-link" class="icon-btn" target="_blank" title="Save annotated PDF" aria-label="Save annotated PDF">&#128190;</a>
+      </div>
+      <div id="image-wrap">
+        <img id="page-image" />
+        <div id="search-layer"></div>
+        <div id="field-highlight-layer"></div>
+        <div id="annotation-layer"></div>
+      </div>
+      <p class="hint">Click-drag on the page to draw a rectangle annotation.</p>
+    </div>
+
+    <div id="side-panel">
+      <section>
+        <h2>Search document</h2>
+        <div id="search-bar-row">
+          <input type="text" id="search-input" placeholder="Search this document..." />
+          <div id="concept-dropdown">
+            <button type="button" id="concept-dropdown-btn">Select concepts &#9662;</button>
+            <div id="concept-dropdown-panel" hidden>
+              <div class="concept-group">
+                <div class="concept-group-label">Regex concepts</div>
+                <div id="regex-concept-checks" class="concept-checklist"></div>
+              </div>
+              <div class="concept-group">
+                <div class="concept-group-label">AI-assisted &middot; NER</div>
+                <div id="ner-concept-checks" class="concept-checklist"></div>
+                <p id="ner-unavailable-hint" class="hint" hidden>
+                  AI-assisted NER service isn't running (see ner_service/README.md).
+                </p>
+              </div>
+            </div>
+          </div>
+          <button id="search-btn">Search</button>
+        </div>
+        <div id="search-options">
+          <label><input type="checkbox" id="search-case-sensitive" /> Case sensitive</label>
+          <label><input type="checkbox" id="search-whole-word" /> Whole word</label>
+          <label><input type="checkbox" id="search-regex" /> Regex</label>
+        </div>
+        <p class="hint">
+          Enter text and/or pick one or more concepts above &mdash; all selected criteria must match on a page (AND).
+        </p>
+        <div id="search-results"></div>
+      </section>
+      <section>
+        <h2>
+          Page text
+          <button class="toggle-btn" data-target="page-text-body" title="Hide">&#9660;</button>
+        </h2>
+        <div id="page-text-body">
+          <pre id="page-text">(select a page)</pre>
+        </div>
+      </section>
+      <section>
+        <h2>Extracted fields (annotation &rarr; text)</h2>
+        <button id="extract-fields-btn">Extract fields</button>
+        <button id="download-fields-btn" disabled>Download JSON</button>
+        <a id="download-ann-xml-link" class="icon-btn" target="_blank" title="Export annotations XML (LEADTOOLS .ann schema)" aria-label="Export annotations XML">&#128228;</a>
+        <table id="fields-table" hidden>
+          <thead><tr><th>Page</th><th>Label</th><th>Value</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p id="fields-empty" class="hint"></p>
+      </section>
+      <section>
+        <h2>
+          QR codes in this document
+          <button class="toggle-btn" data-target="qr-detect-body" title="Hide">&#9660;</button>
+        </h2>
+        <div id="qr-detect-body">
+          <button id="detect-qr-btn">Detect QR codes</button>
+          <pre id="qr-result"></pre>
+        </div>
+      </section>
+      <section>
+        <h2>
+          Generate a QR code
+          <button class="toggle-btn" data-target="qr-generate-body" title="Hide">&#9660;</button>
+        </h2>
+        <div id="qr-generate-body">
+          <input type="text" id="qr-generate-input" placeholder="text to encode" />
+          <button id="qr-generate-btn">Generate</button>
+          <img id="qr-generate-result" />
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
