@@ -43,20 +43,42 @@ def convert_bytes_to_pdf(source_bytes: bytes, source_filename: str) -> bytes:
         input_path = Path(tmp_dir) / f"input{suffix}"
         input_path.write_bytes(source_bytes)
 
-        result = subprocess.run(
-            [soffice, "--headless", "--norestore", "--convert-to", "pdf",
-             "--outdir", tmp_dir, str(input_path)],
-            capture_output=True,
-            timeout=SOFFICE_TIMEOUT_SECONDS,
-            check=False,
-        )
+        try:
+            result = subprocess.run(
+                [soffice, "--headless", "--norestore", "--convert-to", "pdf",
+                 "--outdir", tmp_dir, str(input_path)],
+                capture_output=True,
+                timeout=SOFFICE_TIMEOUT_SECONDS,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise ConversionError(
+                f"PDF can not be generated: LibreOffice timed out after {SOFFICE_TIMEOUT_SECONDS}s converting {source_filename}"
+            ) from exc
         output_path = input_path.with_suffix(".pdf")
         if result.returncode != 0 or not output_path.exists():
-            raise ConversionError(
-                "PDF can not be generated: "
-                f"{result.stderr.decode(errors='replace').strip() or 'unknown LibreOffice error'}"
-            )
+            raise ConversionError(f"PDF can not be generated: {_failure_reason(result, suffix)}")
         return output_path.read_bytes()
+
+
+# LibreOffice ships per-application packages; a missing one makes every file
+# of that kind fail with the same unhelpful "source file could not be loaded".
+_COMPONENT_FOR_SUFFIX = {
+    **dict.fromkeys([".xls", ".xlsx", ".xlsm", ".ods", ".csv", ".tsv"], "libreoffice-calc"),
+    **dict.fromkeys([".ppt", ".pptx", ".pps", ".ppsx", ".odp", ".key"], "libreoffice-impress"),
+    **dict.fromkeys([".svg", ".vsd", ".vsdx", ".odg", ".cdr", ".wmf", ".emf", ".eps"], "libreoffice-draw"),
+}
+
+
+def _failure_reason(result: "subprocess.CompletedProcess", suffix: str) -> str:
+    output = (result.stderr + result.stdout).decode(errors="replace")
+    lines = [l.strip() for l in output.splitlines() if l.strip() and "javaldx" not in l]  # javaldx warning is noise
+    detail = "; ".join(lines) or "unknown LibreOffice error"
+    if "could not be loaded" in detail:
+        component = _COMPONENT_FOR_SUFFIX.get(suffix.lower(), "libreoffice-writer")
+        detail = (f"LibreOffice could not open this {suffix or 'extension-less'} file -- either the format is not "
+                  f"supported or the {component} component is not installed")
+    return detail
 
 
 def convert_path_to_pdf(docx_path: str, pdf_file_name: str) -> str:

@@ -13,4 +13,4 @@ Sample medical records for testing the viewer's upload, search, NER and field-ex
 | `TRC.docx` | Transitions of Care | Three notes around an inpatient stay (admitted 07/02, discharged 07/06/2024). Admission notification on 07/02. Discharge information received on 07/08. Patient engagement and medication reconciliation at the 07/15 visit. |
 | `WCC.docx` | Weight Assessment and Counseling for Nutrition and Physical Activity for Children/Adolescents | An 11-year-old well-child visit on 05/20/2024. Height, weight and BMI percentile (88th). Nutrition counseling and physical activity counseling. |
 
-Viewing or searching a `.docx` requires LibreOffice **with Writer**. On Debian/Ubuntu install `libreoffice-writer`; `libreoffice-core` alone can't open documents.
+Viewing or searching a `.docx` requires LibreOffice **with Writer**. On Debian/Ubuntu install `libreoffice-writer`; `libreoffice-core` alone can't open documents. See the root README's "Any-format upload" section.

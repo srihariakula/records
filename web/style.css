@@ -18,10 +18,12 @@ header h1 { margin: 0; font-size: 18px; }
   background: white;
   border-bottom: 1px solid #e2e2e2;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
 }
 #doc-info { font-size: 13px; color: #444; }
+#upload-hint { flex-basis: 100%; margin: 0; }
 
 main#viewer {
   display: grid;

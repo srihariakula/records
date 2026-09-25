@@ -137,7 +137,25 @@ const resetLabels = () => fs.existsSync(LABEL_LOG) && fs.unlinkSync(LABEL_LOG);
   const [dl2] = await Promise.all([p.waitForEvent('download'), p.click('#download-annotated-link')]);
   check('annotated-PDF download works for that name', dl2.suggestedFilename() === '報告 _final__annotated.pdf', dl2.suggestedFilename());
 
-  // 10. Narrow window: row wraps, nothing overflows
+  // 10. Any file type converts to PDF (images via Pillow/PyMuPDF, office via LibreOffice)
+  check('upload hint lists supported formats', /images \(PNG, JPEG, TIFF/.test(await p.textContent('#upload-hint')));
+  const uploadAndWait = async (file) => {
+    await p.setInputFiles('#file-input', file);
+    await p.click('#upload-btn');
+    await p.waitForFunction(() => !/Uploading/.test(document.querySelector('#doc-info').textContent), null, { timeout: 60000 });
+    return (await p.textContent('#doc-info')).trim();
+  };
+  let info = await uploadAndWait(`${S}/sample.png`);
+  await p.waitForSelector('#page-image[src]');
+  check('PNG upload converts and opens', /image\/png, 1 page/.test(info), info);
+  info = await uploadAndWait(`${S}/sample.tif`);
+  await p.waitForFunction(() => document.querySelectorAll('#thumbnails img').length === 3);
+  check('multi-page TIFF opens with one page per frame', /image\/tiff, 3 page/.test(info) && (await p.locator('#thumbnails img').count()) === 3, info);
+  info = await uploadAndWait(`${S}/unsupported.bin`);
+  check('unsupported file shows the conversion error', /Could not open unsupported\.bin: .*unsupported file type/.test(info), info);
+  check('previous document stays open after a failed upload', !(await p.isHidden('#viewer')) && (await p.locator('#thumbnails img').count()) === 3);
+
+  // 11. Narrow window: row wraps, nothing overflows
   await p.setViewportSize({ width: 1024, height: 800 });
   await p.waitForTimeout(200);
   const ov = await p.$eval('#search-bar-row', r => r.scrollWidth > r.clientWidth + 1);

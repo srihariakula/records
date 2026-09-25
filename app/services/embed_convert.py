@@ -18,7 +18,7 @@ from PIL import Image, ImageDraw
 
 from app.models import AnnotationObject
 from app.services.errors import ConversionError
-from app.services.office_convert import convert_bytes_to_pdf
+from app.services.any_to_pdf import to_pdf_bytes
 
 RENDER_ZOOM = 2.0  # ~144 DPI, matches typical LEADTOOLS demo preview quality
 PAGE_FILENAME_TEMPLATE = "output_Page({page}).jpeg"
@@ -26,9 +26,7 @@ ANNOTATIONS_FILENAME = "annotations.json"
 
 
 def _ensure_pdf_bytes(source_bytes: bytes, source_filename: str) -> bytes:
-    if source_bytes[:4] == b"%PDF":
-        return source_bytes
-    return convert_bytes_to_pdf(source_bytes, source_filename)
+    return to_pdf_bytes(source_bytes, source_filename)
 
 
 def _draw_annotations(image: Image.Image, annotations: List[AnnotationObject], zoom: float) -> None:

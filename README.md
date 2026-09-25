@@ -25,7 +25,7 @@ beyond evaluation.
 
 | Java (LEADTOOLS)                          | Python (this repo)          | Engine swap |
 |--------------------------------------------|------------------------------|-------------|
-| `POST /convert/convertToPdf` (multipart)   | `POST /convert/to-pdf`       | LEADTOOLS `DocumentConverter` → headless **LibreOffice** |
+| `POST /convert/convertToPdf` (multipart)   | `POST /convert/to-pdf`       | LEADTOOLS `DocumentConverter` → headless **LibreOffice** for office/text formats; raster images via **Pillow + PyMuPDF**; PDFs pass through (see **Any-format upload** below) |
 | `POST /convert/convertToPdf` (JSON path)   | `POST /convert/to-pdf-path`  | same |
 | `POST /convert/embedAndConvert`            | `POST /convert/embed-and-convert` | LEADTOOLS `DocumentConverter` + `AnnJavaRenderingEngine` → **PyMuPDF** (rotate/render) + **Pillow** (annotation overlay) |
 
@@ -36,7 +36,7 @@ beyond evaluation.
 | `POST Factory/BeginUpload`   | `POST /Factory/BeginUpload`          | returns an opaque upload token, not a real URI |
 | `POST Factory/UploadDocument`| `POST /Factory/UploadDocument`       | base64 `data` only — the original's raw `buffer: byte[]` alt doesn't map cleanly onto JSON |
 | `POST Factory/UploadDocumentBlob` | `POST /Factory/UploadDocumentBlob` | multipart, single-shot |
-| `POST Factory/EndUpload`     | `POST /Factory/EndUpload`            | finalizes: detects mime type, converts to PDF once (cached), counts pages |
+| `POST Factory/EndUpload`     | `POST /Factory/EndUpload`            | finalizes: detects mime type (by content first), converts to PDF once (cached), counts pages. Adds `conversion_error` (not in the original) when the file couldn't be converted |
 | `POST Factory/AbortUploadDocument` | `POST /Factory/AbortUploadDocument` | |
 | `POST Factory/LoadFromCache` | `POST /Factory/LoadFromCache`        | returns `document: null` if missing, same as the original (not a 404) |
 | `POST Factory/LoadFromUri`   | `POST /Factory/LoadFromUri`          | fetches an http(s) URL server-side — see SSRF note below |
@@ -232,6 +232,26 @@ if you touch either file. This is a local proof-of-concept with no auth (see
 **Honest limitations** below) — don't point it at real PHI outside a
 controlled/local environment.
 
+## Any-format upload
+
+Every upload path (the viewer's `BeginUpload` → `EndUpload`, `/convert/to-pdf`,
+`/convert/embed-and-convert`) goes through one dispatcher,
+`app/services/any_to_pdf.py`:
+
+| Input | Converter | Notes |
+|---|---|---|
+| PDF | passed through | |
+| PNG, JPEG, TIFF (incl. multi-page), BMP, GIF, WEBP, ... | `app/services/image_convert.py` (Pillow decode, PyMuPDF writes the PDF) | One PDF page per TIFF frame (animated GIF/WEBP: first frame). Page size from the image DPI, so a 300 DPI letter scan is 8.5×11 in. Camera photos (a meaningless 72 DPI) are scaled to fit a letter page. EXIF rotation is applied. JPEGs are embedded without recompression. CMYK, transparency, 16-bit and 1-bit images are normalised. |
+| DOC/DOCX, ODT, RTF, TXT, HTML, XLS/XLSX, ODS, CSV, PPT/PPTX, ODP, SVG, ... | `app/services/office_convert.py` (headless LibreOffice) | Needs the matching LibreOffice component (see limitations). |
+| Unidentifiable binary | rejected (415) | Otherwise LibreOffice imports it as pages of garbage text. |
+
+The type is sniffed from the file's **content first** (magic bytes). The
+viewer sends only a file name, names can be wrong or have no extension, and
+browsers often declare `application/octet-stream`. So a PNG named `scan.pdf`,
+or an extension-less `.docx`, still converts correctly. Why LibreOffice isn't
+used for images: without its Draw component it can't import images at all,
+and even with it a 3-page TIFF came out as 11 pages.
+
 ## Honest limitations vs. the original
 
 - **Annotation format is not compatible.** LEADTOOLS' `.ann` XML
@@ -242,10 +262,17 @@ controlled/local environment.
 - **No OCR.** `Page/GetText` reads the PDF's embedded text layer via PyMuPDF.
   Scanned/image-only pages return empty text — LEADTOOLS' OCR engine integration
   isn't ported.
-- **`to-pdf` and any non-PDF input require LibreOffice installed separately**
-  (`brew install --cask libreoffice` on macOS, `apt-get install libreoffice` on
-  Debian/Ubuntu). It's an external binary invoked via subprocess, not a pip
-  package — the same approach tools like Gotenberg use.
+- **Office/text inputs require LibreOffice installed separately**
+  (`brew install --cask libreoffice` on macOS; on Debian/Ubuntu
+  `apt-get install libreoffice-writer libreoffice-calc libreoffice-impress`,
+  or the full `libreoffice`). It's an external binary invoked via subprocess,
+  not a pip package — the same approach tools like Gotenberg use. Each
+  component is a separate package: without `-writer` no document opens at all,
+  without `-calc` spreadsheets/CSV fail, without `-impress` slides fail, and
+  `EndUpload`'s `conversion_error` names the missing one. Images and PDFs don't
+  need LibreOffice.
+- **Converted images are image-only pages** (no text layer, since there's no
+  OCR), so text search, NER and field extraction find nothing on them.
 - **Conversion fidelity will differ** from LEADTOOLS' (or Word's) layout engine —
   expect font substitution and minor pagination differences on complex documents.
 - **The document cache is in-process and disk-backed under the OS temp dir**
@@ -292,8 +319,10 @@ Then open **http://127.0.0.1:8811/viewer/** in a browser.
 `web/` is a small vanilla HTML/JS/CSS page (no build step, no framework) mounted
 at `/viewer` by `app/main.py`, calling this port's own API directly:
 
-- Upload a file (chunked-upload flow: `BeginUpload` → `UploadDocumentBlob` →
-  `EndUpload`)
+- Upload any file (chunked-upload flow: `BeginUpload` → `UploadDocumentBlob` →
+  `EndUpload`); it's converted to PDF server-side (see **Any-format upload**).
+  If conversion fails, the reason is shown and the previously open document
+  stays open
 - Page through it via a thumbnail strip (`Page/GetThumbnail`) and a main image
   view (`Page/GetImage`)
 - See the page's extracted text (`Page/GetText`)

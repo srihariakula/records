@@ -45,6 +45,7 @@ def _to_dto(entry: DocumentEntry) -> DocumentDTO:
         mime_type=entry.mime_type,
         page_count=entry.page_count,
         has_annotations=entry.has_annotations(),
+        conversion_error=entry.conversion_error,
     )
 
 

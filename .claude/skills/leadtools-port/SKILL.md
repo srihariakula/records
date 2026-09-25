@@ -29,7 +29,7 @@ This repo is a **proof of concept for scoping a LEADTOOLS → Python migration**
 
 ## Engine swaps already chosen (reuse them before adding a dependency)
 
-- LEADTOOLS `DocumentConverter` → headless LibreOffice (`office_convert.py`). This needs `libreoffice-writer`.
+- LEADTOOLS `DocumentConverter` / `DocumentFactory` loading → `any_to_pdf.to_pdf_bytes()`. PDFs pass through, images go to `image_convert.py` (Pillow + PyMuPDF), and office files go to headless LibreOffice (`office_convert.py`, which needs `libreoffice-writer`, `-calc` and `-impress`). Call the dispatcher; don't call a converter directly.
 - Rendering, text and search → PyMuPDF (`fitz`).
 - Annotation overlays → Pillow or PyMuPDF annotation objects.
 - QR codes → the `qrcode` library to write them and OpenCV to read them (no system zbar needed).

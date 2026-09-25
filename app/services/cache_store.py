@@ -79,6 +79,7 @@ class DocumentEntry:
     last_access: float = field(default_factory=time.time)
     ttl_seconds: int = DEFAULT_TTL_SECONDS
     annotations: Dict[int, List[AnnotationObject]] = field(default_factory=dict)
+    conversion_error: Optional[str] = None  # why the upload couldn't be turned into a PDF, if it couldn't
 
     def is_expired(self) -> bool:
         return (time.time() - self.last_access) > self.ttl_seconds
@@ -155,14 +156,17 @@ class DocumentCache:
 
         detected_mime = document_session.detect_mime_type(file_path, mime_type)
         page_count = 0
+        conversion_error = None
         try:
             pdf_path = document_session.get_pdf_path_for(file_path, detected_mime)
             page_count = document_session.count_pages(pdf_path)
-        except ConversionError:
-            pass  # best-effort metadata; a real page fetch will surface the actual error
+        except ConversionError as exc:
+            # Still cache the upload (the original can be downloaded, and a retry
+            # after installing a converter works), but report why it has no pages.
+            conversion_error = exc.message
 
         entry = DocumentEntry(document_id=document_id, file_path=file_path, name=name, mime_type=detected_mime,
-                               page_count=page_count)
+                               page_count=page_count, conversion_error=conversion_error)
         with self._lock:
             self._entries[document_id] = entry
         return entry

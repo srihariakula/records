@@ -33,6 +33,14 @@ d = pymupdf.open()
 d.new_page().insert_text((50, 72), "Member: Jane Doe\nEmail: jane@example.com\nDiagnosis: Type 2 Diabetes\nMedication: Metformin 500mg", fontsize=12)
 d.new_page().insert_text((50, 72), "Diagnosis: Hypertension\nMedication: Lisinopril 10mg", fontsize=12)
 d.save("$WORK_DIR/sample.pdf")
+# Non-PDF uploads for the any-format conversion checks.
+from PIL import Image, ImageDraw
+def page(text):
+    im = Image.new("RGB", (850, 1100), "white"); ImageDraw.Draw(im).text((60, 60), text, fill="black"); return im
+page("PNG upload").save("$WORK_DIR/sample.png")
+frames = [page(f"TIFF page {i}") for i in (1, 2, 3)]
+frames[0].save("$WORK_DIR/sample.tif", save_all=True, append_images=frames[1:])
+open("$WORK_DIR/unsupported.bin", "wb").write(bytes(range(256)) * 4)
 EOF
 
 cleanup() { kill "${APP_PID:-}" "${NER_PID:-}" 2>/dev/null; }

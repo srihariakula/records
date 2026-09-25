@@ -387,10 +387,17 @@ el("upload-btn").addEventListener("click", async () => {
     alert("Choose a file first");
     return;
   }
-  state.currentFile = file;
-  el("doc-info").textContent = "Uploading...";
+  el("doc-info").textContent = `Uploading and converting ${file.name} to PDF...`;
   try {
     const doc = await uploadFile(file);
+    // The server converts every upload (images, office files, ...) to PDF; if
+    // that failed it still caches the file but reports why there are no pages.
+    // Keep whatever document was open before rather than showing an empty viewer.
+    if (doc.conversion_error || !doc.page_count) {
+      el("doc-info").textContent = `Could not open ${file.name}: ${doc.conversion_error || "the document has no pages"}`;
+      return;
+    }
+    state.currentFile = file;
     state.documentId = doc.document_id;
     state.pageCount = doc.page_count;
     state.searchMatches = {};

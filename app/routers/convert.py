@@ -6,7 +6,7 @@ from fastapi import APIRouter, File, Form, UploadFile
 from fastapi.responses import JSONResponse, Response
 
 from app.models import AnnotationObject, DocumentConverterRequest, DocumentConverterResponse
-from app.services import content_disposition, embed_convert, office_convert
+from app.services import any_to_pdf, content_disposition, embed_convert, office_convert
 
 router = APIRouter(prefix="/convert", tags=["convert"])
 
@@ -16,8 +16,10 @@ router = APIRouter(prefix="/convert", tags=["convert"])
 
 @router.post("/to-pdf")
 async def convert_to_pdf(file: UploadFile = File(...)) -> Response:
-    """Mirrors convertToPdf(InputStream, FormDataContentDisposition) -> application/pdf."""
-    pdf_bytes = office_convert.convert_bytes_to_pdf(await file.read(), file.filename or "document")
+    """Mirrors convertToPdf(InputStream, FormDataContentDisposition) -> application/pdf.
+    Accepts PDFs (returned as-is), raster images and office formats -- see
+    app.services.any_to_pdf."""
+    pdf_bytes = any_to_pdf.to_pdf_bytes(await file.read(), file.filename or "document")
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",

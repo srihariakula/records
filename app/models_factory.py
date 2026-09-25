@@ -19,6 +19,9 @@ class DocumentDTO(BaseModel):
     mime_type: Optional[str] = None
     page_count: int = 0
     has_annotations: bool = False
+    # Not in the original: set when the upload couldn't be converted to PDF
+    # (unsupported format, missing LibreOffice component, corrupt file...).
+    conversion_error: Optional[str] = None
 
 
 class BeginUploadRequest(BaseModel):
