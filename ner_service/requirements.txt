@@ -1,0 +1,14 @@
+# Separate venv from the main app's requirements.txt: gliner2 requires Python
+# 3.10+, while the main app's venv is pinned to Python 3.9 (see ../README.md,
+# "AI-assisted NER (GLiNER2)" section, for why this runs as its own process).
+#
+# transformers is pinned below (not left at gliner2's own >=4.38,<5 bound)
+# because transformers>=4.57 raises AttributeError while loading this model's
+# DebertaV2 tokenizer (`extra_special_tokens` handling changed); 4.46.3 is a
+# version verified to load fastino/gliner2.5-* correctly.
+fastapi>=0.110
+uvicorn[standard]>=0.29
+gliner2[local]==2.0.0
+transformers==4.46.3
+sentencepiece>=0.2
+protobuf>=4
