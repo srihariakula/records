@@ -1,7 +1,8 @@
 # ner_service
 
 A standalone [GLiNER2](https://github.com/fastino-ai/GLiNER2) inference
-sidecar used by the main app's "AI-assisted NER" search-bar pills. It's a
+sidecar used by the main app's search bar: with the **NER** checkbox ticked, the
+typed text is sent here as a zero-shot entity label. It's a
 separate process with its own venv because `gliner2` requires Python 3.10+,
 while the main app's venv is pinned to Python 3.9 (see the root
 [README.md](../README.md)'s "AI-assisted NER (GLiNER2)" section for the full
@@ -40,6 +41,6 @@ Env vars:
 
 The main app finds this service at `DOCSVC_NER_SERVICE_URL` (default
 `http://127.0.0.1:8801`) -- see `app/services/ner_client.py`. If this service
-isn't running, the AI-assisted NER pills in the viewer gray themselves out
-(`Factory/ListConcepts` reports `ner_available: false`); the REGEX CONCEPTS
-pills and plain text search work regardless.
+isn't running, the viewer grays out the NER checkbox
+(`Factory/ListConcepts` reports `ner_available: false`); the regex concepts
+and plain text search work regardless.
