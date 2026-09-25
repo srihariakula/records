@@ -293,7 +293,7 @@ main#viewer.thumbnails-hidden #thumbnails-panel { display: none; }
 #concept-dropdown-panel {
   position: absolute;
   top: calc(100% + 4px);
-  right: 0;
+  left: 0; /* button sits at the start of the wrapped search row -- open inward */
   z-index: 5;
   width: 260px;
   max-height: 320px;
